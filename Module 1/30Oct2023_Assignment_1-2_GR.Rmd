@@ -1,0 +1,79 @@
+---
+title: "ADS506 Assignment 1.2 <Dataset name>"
+author: "Gabi Rivera"
+date: "`r Sys.Date()`"
+output: pdf_document
+---
+
+**Assignment: Propose a Time Series Dataset for Your Final Project**
+
+```{r warning=FALSE, message=FALSE}
+#library(<PACKAGE_DEPENDENCIES>)
+
+library(tidyverse)
+library(dplyr)
+```
+
+## Data Source
+
+The S&P 500 stock price dataset was acquired from Yahoo Finance database and was neatly compiled as a time series exercise in Kaggle. The link is provided below. The daily time line spans from 23Nov2015 to 20Nov2020 with index prices given at high, low, open, close, and adjusted close values.The total trading activity is also provided as under volume. 
+
+Link: https://www.kaggle.com/datasets/arashnic/time-series-forecasting-with-yahoo-stock-price 
+
+## Importing the Data
+
+```{r}
+# import the data:
+spy = read.csv('yahoo_stock.csv', stringsAsFactors = FALSE)
+head(spy)
+
+str(spy)
+
+# transform if necessary:
+spy$Date <- as.Date(spy$Date)
+summary(spy)
+
+```
+
+## Time Series Plot
+
+```{r}
+ggplot(spy, aes(Date, Adj.Close)) +
+  xlab('Date') + ylab('S&P 500 Stock Price') +
+  scale_x_date(date_breaks = "1 year", date_labels = "%Y") +
+  geom_line()+
+  ggtitle('Adjusted Close Stock Price')
+
+ggplot(spy, aes(Date, Close)) +
+  xlab('Date') + ylab('S&P 500 Stock Price') +
+  scale_x_date(date_breaks = "1 year", date_labels = "%Y") +
+  geom_line()+
+  ggtitle('Close Stock Price')
+
+ggplot(spy, aes(Date, Open)) +
+  xlab('Date') + ylab('S&P 500 Stock Price') +
+  scale_x_date(date_breaks = "1 year", date_labels = "%Y") +
+  geom_line()+
+  ggtitle('Open Stock Price')
+
+ggplot(spy, aes(Date, High)) +
+  xlab('Date') + ylab('S&P 500 Stock Price') +
+  scale_x_date(date_breaks = "1 year", date_labels = "%Y") +
+  geom_line()+
+  ggtitle('High Stock Price')
+
+ggplot(spy, aes(Date, Low)) +
+  xlab('Date') + ylab('S&P 500 Stock Price') +
+  scale_x_date(date_breaks = "1 year", date_labels = "%Y") +
+  geom_line()+
+  ggtitle('Low Stock Price')
+
+```
+
+## Discussion
+
+For preliminary observation, there is an overall upward trend with some inconsistent seasonal groves. There are also drastic dips around 2016's low oil value incidence and 2019 as well as 2020 Covid era. There's not much difference between the high, low, open, and close prices. I think it would be really beneficial to explore the S&P 500 stock price dataset not only for this course but also for personal exposure to the stock market trend. After all, developing tools for forecasting the stock market prices has always been enticing and lucrative. I think having a hands on experience in analyzing stock market prices over time is going to be worth it for personal life and professional skills. 
+
+
+
+...
