@@ -1,0 +1,200 @@
+---
+title: "ADS-506 Mod 2"
+output:
+  word_document: default
+  html_document:
+    df_print: paged
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+# Uploaded Packages: 
+library(tidyverse)
+library(fpp3)
+library(slider)
+library(ggplot2)
+library(dplyr)
+library(fpp2)
+library(readr)
+library(zoo)
+
+```
+
+## Module 2 Assignment Exercises 
+  
+**Textbook Exercises (Pages 113-116 & 141)**  
+**5.8**  
+Forecasting Australian Wine Sales : Figure 5.13 shows time plots of monthly sales of six types of Australian wines (red, rose, sweet white, dry white, sparkling, and fortified) for 1980-1994. Data available in AustralianWines.xls. The units are thousands of liters. You are hired to obtain short-term forecasts (2-3 months ahead) for each of the six series, and this task will be repeated every month
+
+```{r, fig, include = FALSE}
+# # b) Fortified wine has the largest market share of the six types of wine. You are asked to focus on fortified wine sales alone and produce as accurate a forecast as possible for the next two months
+
+aus_wine <- read_csv("AustralianWines.csv", na = "*",
+                     col_types = cols(Rose = col_number()),
+                     show_col_types = FALSE) |> 
+    mutate(Month = mdy(str_replace(Month, '-', '-01-')) |> yearmonth()) 
+
+aus_wine |> 
+    pivot_longer(cols = -Month, names_to = 'Varietal', values_to = 'Sales') |> 
+    ggplot(aes(Month, Sales)) +
+    geom_line() +
+    facet_wrap(~ Varietal, scales = "free_y") 
+```
+
+```{r, fort}
+# # b) Fortified wine has the largest market share of the six types of wine. You are asked to focus on fortified wine sales alone and produce as accurate a forecast as possible for the next two months
+
+# ● Start by partitioning the data using the period until December 1993 as the training period.
+# ● Apply Holt-Winter’s exponential smoothing (with multiplicative seasonality) to sales.
+
+# create a time series object for fortified wine sales (tsibble is recommended)
+aus_wine$Date = as.Date(aus_wine$Month, format = "%m/%d/%Y")
+wine_ts <- ts(aus_wine$Fortified, start = c(1980, 1), end = c(1994, 12), frequency = 12)
+plot(wine_ts, ylab="Fortified Wine Sales", xlab="Year")
+
+# create training/validation sets for the model (include at least one year in the validation set)
+fixed.nValid <- 12
+fixed.nTrain <- length(wine_ts) - fixed.nValid
+train.ts <- window(wine_ts, start = c(1980, 1), end = c(1980, fixed.nTrain))
+valid.ts <- window(wine_ts, start = c(1980, fixed.nTrain + 1), 
+                   end = c(1980, fixed.nTrain + fixed.nValid))
+
+# fit an ETS model to the training set (try different models to find the best)
+fort.train.model <- ets(train.ts, model = "ANN")
+
+# forecast the validation period
+fort.train.pred <- forecast(fort.train.model, h=fixed.nValid)
+
+# review accuracy to select the best model
+summary(fort.train.pred)
+accuracy(fort.train.pred, valid.ts)
+
+# Use the full data set to fit the best model
+fort.model <- ets(wine_ts, model = "ANN")
+
+# forecast the next two months
+fort.pred <- forecast(fort.model, h=2)
+
+# print the last two months of the forecast (this provides the answer to the question)
+head(fort.pred)
+
+plot(fort.pred, ylab = "Fortified Wine Sales", xlab = "Year")
+  lines(train.ts, col = "black")
+  lines(valid.ts, col = "purple")
+  
+```
+
+```{r, holt}
+# # c) Create a time plot of the residuals from the Holt-Winter’s exponential smoothing.
+
+fort.train.holt <- ets(train.ts, model = "MAA") # MAA model to fit Holt-Winter's exponential smoothing
+
+plot(fort.train.holt$residuals, xlab = "Year", 
+     ylab = "Residuals,Thousands of Liters")
+
+```
+
+\newpage
+**5.9**  
+Natural Gas Sales : Figure 5.14 shows a time plot of quarterly natural gas sales (in billions of BTU’s) of a certain company, over a period of 4 years. The company’s analyst is asked to use a moving average model to forecast sales in Winter 2005.
+
+```{r, rep}
+#dataset comes from
+# https://fred.stlouisfed.org/series/NATURALGASD11
+
+NaturalGas <- read_csv("NaturalGas.csv", 
+    col_types = cols(Quarter = col_date(format = "%m/%d/%Y")))
+
+head(NaturalGas)
+
+# a) Reproduce the time plot with the overlaying MA(4) line.
+
+start_date = as.Date("2001-01-01")
+end_date = as.Date("2004-10-01")
+
+ng_df <- NaturalGas %>%
+  filter(Quarter >= start_date, Quarter <= end_date)
+head(ng_df)
+
+natural_gas <- ts(ng_df$NaturalGas, start = c(2001, 1), frequency = 1)
+ng.ma <- rollmean(natural_gas, k = 4, align = "right")
+
+autoplot(natural_gas, series = "Actual", ylab = "Natural Gas Prices", xlab = "Year") +
+  autolayer(ng.ma, series = "MovingAvg") 
+ 
+```
+
+ b) What can we learn about the series from the MA line? There is a declining trend in gas sales during this period
+ 
+ # The moving average line reveals that there is a downward trend on fig 5.14. This suggest declining gas prices over 2001 to 2004. 
+ 
+ c) Run a moving average forecaster with adequate season length. Are forecasts generated by this method expected to over-forecast, under-forecast, or accurately forecast actual sales? Why?
+ 
+ # With the data points set at 4 and the season length ran throughout the dataset, the forecast seems to be under-forecasting peaks and over forecasting dips compared to the actual sales so the seasonal pattern is smooth out. It does seem to forecast the general cyclical trend relatively accurate. 
+
+```{r, ma}
+
+nat_gas <- ts(NaturalGas$NaturalGas, start = c(2001, 1), frequency = 4)
+natg.ma <- rollmean(nat_gas, k = 4, align = "right")
+
+autoplot(nat_gas, series = "Actual", ylab = "Natural Gas Prices", xlab = "Year") +
+  autolayer(natg.ma, series = "MovingAvg") 
+ 
+```
+
+
+\newpage
+**6.6**
+Forecasting Australian Wine Sales : Figure 6.26 shows time plots of monthly sales of six
+types of Australian wines (red, rose, sweet white, dry white, sparkling, and fortified) for
+1980-1994. The data is available in AustralianWines.xls. The units are thousands of liters.
+You are hired to obtain short-term forecasts (2-3 months ahead) for each of the six series,
+and this task will be repeated monthly
+
+ b) Fortified wine has the largest market share of the six types of wine considered. You are
+asked to focus on fortified wine sales alone and produce as accurate as possible forecasts
+for the next 2 months.  
+ - Start by partitioning the data using the period until December 1993 as the training
+period.  
+ - Fit a regression model to sales with a linear trend and seasonality.  
+ i.  Create the "actual vs. forecast" plot. What can you say about model fit?  
+ ii.  Use the regression model to forecast sales in January and February 1994  
+
+```{r, reg}
+# Use the code from 5.8 as a template for this question
+
+# Data Frame: 
+#wine_ts
+
+# Partitioned data set: 
+#train.ts
+#valid.ts
+
+# Fit regression model:
+fort.lmt.model <- tslm(train.ts ~ trend + season)
+
+# Prediction: 
+fort.lmt.pred <- forecast(fort.lmt.model, h = 12)
+
+# Plot fitted trend and seasonal predicted line:
+plot(fort.lmt.pred, ylab = "Fortified Wine Sales", xlab = "Year")
+  lines(fort.lmt.pred$fitted, col = "pink")
+  lines(valid.ts, col = "black")
+
+# The model fit in pink curve follows the same downward trend as the training data  with the seasonal spikes slightly under projected at the beginning and becomes slightly over projected as the dips as well as peaks progress in the later years leading to 1995. 
+  
+  
+# Forecast from Jan to Dec 1994: 
+head(fort.lmt.pred)
+
+# Accuracy:
+accuracy(fort.lmt.pred, valid.ts)
+summary(fort.lmt.pred)
+
+```
+
+
+
+
