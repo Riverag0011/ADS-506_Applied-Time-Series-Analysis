@@ -1,0 +1,79 @@
+---
+title: "ADS-506 Assignment 3.1"
+author: "Gabi Rivera"
+format: pdf
+editor: visual
+---
+
+```{r setup}
+#| echo: false
+#| message: false
+#| warning: false
+library(tidyverse)
+library(fpp3)
+library(tidymodels)
+library(gt)
+```
+
+The assignment for this module is a mixture of programming and written work. Complete this assignment in Quarto or R Markdown. You will need to include the question and number that you are answering within your submitted assignment. Once completed, you will render/knit your deliverable to a PDF file.
+
+**Textbook Exercises (Pages 187-188)**
+
+For predicting whether the agricultural epidemic of powdery mildew in mango will erupt in a certain year in the state of Uttar Pradesh in India, Misra et al. (2004) records during 1987-2000. The epidemic typically occurs in the third and fourth week of March, and hence outbreak status is known by the end of March of a given year. The authors used a logistic regression model with two weather predictors (maximum temperature and relative humidity) to forecast an outbreak. The data is shown in the table below and are available in PowderyMildewEpidemic.csv
+
+```{r}
+pme_history <- read_csv("PowderyMildewEpidemic.csv", show_col_types = FALSE) |> 
+    mutate(Outbreak = factor(Outbreak, levels = c("No", "Yes")))
+gt(pme_history)
+```
+
+\newpage
+
+## 8.4
+
+Compute naive forecasts of epidemic status for years 1995-1997 using next-year forecasts ($F_{t|1}$ = F$_{t}$ ). What is the naive forecast for year 2000? Summarize the results for these four years in a classification matrix.
+
+```{r}
+# ... code here ...
+
+# output naive forecast for all years
+```
+
+```{r}
+#output classification matrix
+
+```
+
+\newpage
+
+## 8.5
+
+Partition the data into training and validation periods, so that years 1987-1994 are the training period. Fit a logistic regression to the training period using the two predictors and report the outbreak probability as well as a forecast for year 1995 (use a threshold of 0.5).
+
+```{r}
+# ... code here ...
+
+# prediction output for 1995
+```
+
+\newpage
+
+## 8.6
+
+Generate outbreak forecasts for years 1996, 1997 and 2000 by repeatedly moving the training period forward. For example, to forecast year 1996, partition the data so that years 1987-1995 are the training period. Then fit the logistic regression model and use it to generate a forecast (use threshold 0.5). Output a table of forecasts for 1995-1997 and 2000.
+
+```{r}
+# ... code here ...
+
+# output LR forecast for 1995-1997 and 2000.
+```
+
+\newpage
+
+## 8.7
+
+```{r}
+# ... code here ...
+
+# output LR confusion matrix
+```
