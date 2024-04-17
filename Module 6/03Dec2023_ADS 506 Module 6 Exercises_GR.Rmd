@@ -1,0 +1,184 @@
+---
+title: "ADS 506 Module 6 Exercises"
+author: "Gabi Rivera"
+date: "2023-12-03"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(fpp3)
+
+```
+
+## Chapter 9: Neural Networks (Page 201): #2 & 3
+
+Forecasting Australian Wine Sales: Figure 6.26 shows time plots of monthly sales of six types of
+Australian wines (red, rose, sweet white, dry white, sparkling, and fortified) for 1980-1994. Data
+available in AustralianWines.csv. The units are thousands of liters. You are hired to obtain
+short-term forecasts (2-3 months ahead) for each of the six series, and this task will be repeated
+every month.
+
+```{r dataset}
+wines <- read_csv("AustralianWines.csv",
+         show_col_types = FALSE) |> 
+         mutate(Month = as.Date(paste(Month, '01'), format = "%b-%y %d") |> 
+         yearmonth()) 
+
+wines_ts <- subset(wines, select=c("Month", "Fortified")) |>
+            as_tsibble(index = Month)
+
+
+wines |> 
+    pivot_longer(-Month, names_to = "Wine", values_to = "Sales") |>
+    ggplot(aes(x = Month, y = Sales)) +
+    geom_line() +
+    facet_wrap(Wine ~ ., scales = "free_y", ncol = 2) 
+```
+
+## 2. Use neural networks to forecast fortified wine sales, as follows:
+
+● Partition the data using the period until December 1993 as the training period.
+
+```{r, partition}
+# create training set
+wines_trn = wines_ts |>
+            filter_index(.~ "1993 Dec")
+
+# create validation set
+wines_val = wines_ts |>
+            anti_join(wines_trn, by = 'Month')
+```
+
+● Run a neural network using R’s nnetar with 11 non-seasonal lags (i.e., p = 11). Leave
+all other arguments at their default.
+
+```{r, nnetar}
+# train the model
+wine_nnetar = wines_trn |>
+    model(nnetar = NNETAR(Fortified, p = 11))
+wine_nnetar
+
+# forecast 
+wine_pred = forecast(wine_nnetar,h=12)
+wine_pred
+```
+
+a. Create a time plot for the actual and forecasted series over the training period.
+Create also a time plot of the forecast errors for the training period. Interpret
+what you see in the plots.
+
+Forecasted values for the training dataset using NNETAR model performed really well. The forecasted or fitted values are almost superimposed to the training dataset. The forecasted values for the validation dataset also performed well. There are peaks that are under forecasted but with the scope is covered wihtin the 95% interval. 
+The residual looks random overall. There are presense of seasonality still but pattern looks normally distributed. I don't think there's any negative under laying assumptions to consider.
+
+```{r, plot }
+# plot the fitted values with the actuals for the training period
+fitted_values <- fitted(wine_nnetar)
+
+wine_pred |>
+  autoplot(wines_ts) +
+  autolayer(fitted_values, colour = 'blue')+
+  theme_minimal() +
+  labs(title = "NNETAR Fortified Wine Sale Forecast")
+
+```
+
+```{r, resid}
+# Create also a time plot of the forecast errors for the training period
+
+observed_values <- as.numeric(wines_trn$Fortified)
+predicted_values <- as.numeric(fitted_values$.fitted)
+residuals <- observed_values - predicted_values
+nresid <- data.frame(wines_trn$Month, residuals)
+df_clean <- na.omit(nresid)
+resid = ts(df_clean, frequency = 12)
+
+
+plot(resid,ylab="Residuals", 
+     main = "Fortified Wine NN Errors (Training Data)", 
+     col = "blue")
+
+```
+
+b. Use the neural network to forecast sales for each month in the validation period
+(January 1994 to December 1994).
+
+```{r, nn pred}
+
+# validation
+head(wines_val)
+
+#plot the forecast
+fc = wine_pred |>
+      autoplot(wines_val)
+fc
+
+#output the forecast for the months requested
+wine_pred
+
+#report the forecast accuracy for the months requested
+accuracy(wine_pred, wines_val)
+
+
+```
+
+
+## 3. Compare your neural network to an exponential smoothing model used to forecast fortified wine sales.
+
+a. Use R’s ets function to automatically select and fit an exponential smoothing model to
+the training period until December 1993. Which model did ets fit?
+
+ETS chose and fit the MAM model in this case. 
+
+```{r, ets}
+# fit models
+wine_ets = wines_trn |>
+    model(ets = ETS(Fortified))
+wine_ets
+
+```
+
+
+b. Use this exponential smoothing model to forecast sales for each month in 1994.
+
+```{r, ets pred}
+# forecast the next 12 months 
+wine_ets_pred <- forecast(wine_ets, h = 12)
+
+# plot the forecasts
+wine_ets_pred |>
+  autoplot(wines_val)
+
+# output the forecast for the months requested
+wine_ets_pred
+
+```
+
+
+c. How does the neural network compare to the exponential smoothing model in terms of
+predictive performance in the training period? In the validation period?
+
+In terms of predictive performance in the training period, NN have a lower MAPE value at 5.8 compared to ETS at 7.1. This indicates that NN have better accuracy. NN also have lower RMSE score at 216 as well as MAE at 167. 
+In terms of validation period, accuracy scores also supports that NN model performed slightly better than ETS. NN has 308 RMSE, 244 MAE, and 10.0 MAPE. ETS has 319 RMSE, 243 MAE, and 10.2 MAPE. 
+
+```{r, accuracy}
+# NNETAR
+accuracy(wine_nnetar)
+accuracy(wine_pred, wines_val) 
+
+# ETS 
+accuracy(wine_ets)
+accuracy(wine_ets_pred,wines_val)
+
+```
+
+
+
+
+
+
+
