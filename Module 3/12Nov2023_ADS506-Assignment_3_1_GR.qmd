@@ -1,0 +1,360 @@
+---
+title: "ADS-506 Assignment 3.1"
+author: "Gabi Rivera"
+format: pdf
+editor: visual
+---
+
+```{r setup}
+#| echo: false
+library(tidyverse)
+library(fpp3)
+library(zoo)
+library(readr)
+library(dplyr)
+library(forecast)
+library(tseries)
+library(gridExtra)
+```
+
+ADS 506 Module 4 Exercises: Chapter 7 This assignment is due on Day 7 of the learning week. The assignment for this module is a mixture of programming and written work. Complete this entire assignment in R Markdown. You will need to include the question and number that you are answering within your submitted assignment. Once completed, you will knit your deliverable to a Word/PDF file.
+
+**Chapter 7: Regression Models: Autocorrelation & External Info (Pages 170-178): #1, 2, & 6**
+
+***Note: The homework file has an incorrect time scale ... what's above is correct (and matches the text book)***
+
+1\. Analysis of Canadian Manufacturing Workers Work-Hours: The time series plot in Figure 7.7 describes the average annual number of weekly hours spent by Canadian manufacturing workers. The data is available in CanadianWorkHours.csv.
+
+```{r can-data}
+#| echo: false
+work_hrs <- read_csv("CanadianWorkHours.csv", show_col_types = FALSE) |> 
+    as_tsibble(index = Year)
+
+autoplot(work_hrs, Hrs_per_Wk) + 
+    theme_minimal() +
+    labs(caption = "Figure 7.7")
+
+```
+
+\
+a. If we computed the autocorrelation of this series, would the lag-1 autocorrelation exhibit negative, positive, or no autocorrelation? How can you see this from the plot?
+
+It will most likely exhibits a positive or stickiness autocorrelation at lag-1 because the original plot has a declining linear trend up until \~1988. Looking at the plot and knowing that lag-1 series is the original data moved one time period forward, the autocorrelation will most likely behave in a descending order.
+
+b\. Compute the autocorrelation and produce an ACF plot. Verify your answer to the previous question.
+
+```{r L1}
+#code that produces an ACF plot should go here.
+
+manu_wh = ts(work_hrs$Hrs_per_Wk, start = '1966', end = '2000', frequency = 1)
+acf(manu_wh, lag.max = 1, main = 'ACF at Lag 1')
+acf(manu_wh, lag.max = 12, main = 'ACF at Lag 12')
+
+# The positive autocorrelation is more noticable at lag =12. 
+```
+
+2\. Forecasting Walmart Stock: Figure 7.10 shows a time plot of Wal-Mart daily closing prices between February 2001 and February 2002. The data is available at finance.yahoo.com and in WalmartStock.csv.
+
+The ACF plots of these daily closing prices and its lag-1 differenced series are in Figure 7.11. Table 7.4 shows the output from fitting an AR(1) model to the series of closing prices and to the series of differences. Use all the information to answer the following questions.
+
+```{r walmart-data}
+#| echo: false
+wmt <- read_csv("WalmartStock.csv", show_col_types = FALSE) |> 
+  mutate(Date = mdy(Date),
+         tday = row_number()) |> 
+  as_tsibble(index = tday)
+
+wmt |> 
+    ggplot(aes(Date, Close)) + #autoplot won't work of the tday index
+    geom_line() +
+    theme_minimal() +
+    labs(title = "Walmart Stock (WMT)", 
+         caption = "Figure 7.10") 
+```
+
+```{r fig7.11}
+#| echo: false
+
+#side by side ACF plots
+acf1 <- wmt |> 
+    ACF(Close) |> 
+    autoplot() +
+    labs(title = "ACF Plot for Close")
+    
+acf2 <- wmt |> 
+    ACF(Differenced) |> 
+    autoplot() +
+    labs(title = "ACF Plot for Differenced Series",
+         caption = "Figure 7.11")
+
+grid.arrange(acf1, acf2, ncol = 2) 
+
+```
+
+a\. Create a time plot of the differenced series.
+
+```{r wmt}
+#code that produces a plot should go here
+
+wmt_c = ts(wmt$Close, start = c(2001, 02), end = c(2022, 02), frequency = 5)
+plot(diff(wmt_c, lag=1), ylab = 'Close Series Differenced at Lag-1', xlab = 'Year', main = '')
+```
+
+b\. Which of the following is/are relevant for testing whether this stock is a random walk?
+
+(enter "Yes" *OR* "No" in column 1 below)
+
+```{r}
+#| echo: false
+tribble(
+  ~Question, ~Answer,
+  "a) The autocorrelations of the closing price series.", "No",
+  "b) The AR(1) slope coefficient for the closing price series.", "Yes",
+  "c) The AR(1) constant coefficient for the closing price series.", "No",
+  "d) The autocorrelations of the differenced series.", "Yes",
+  "e) The AR(1) slope coefficient for the differenced series.", "No",
+  "f) The AR(1) constant coefficient for the differenced series.", "No"
+) |> 
+knitr::kable()
+```
+
+c\. Recreate the AR(1) model output for the Close price series shown in the left panel of Table 7.4.
+
+```{r}
+#HINT: to match the textbook we use the forecast::Arima() function
+# output from fable::ARIMA() is also acceptable
+
+ar1_fit = arima(wmt_c, order = c(1, 0, 0))
+summary(ar1_fit)
+adf.test(wmt_c) # random walk test
+```
+
+Does the AR model indicate that this is a random walk? Explain how you reached your conclusion.
+
+*The augmented Dickey-Fuller test of the time series indicates that it is non-stationary meaning that it is random walk. The p value of 0.793 is higher than 0.05 sigsnificance level and so the null hypothesis that the series is non-stationary can't be rejected. Looking at the AR model, the slope coefficient is 0.8396 is not equals to 1.*
+
+d\. What are the implications of finding that a time series is a random walk? Indicate the correct statement(s) below with 'Yes' OR 'No':
+
+```{r}
+#| echo: false
+tribble(
+  ~Question, ~Answer,
+  "a) It is impossible to obtain useful forecasts of the series.", "Yes",
+  "b) The series is random.", "No",
+  "c) The changes in the series from one period to the other are random.", "Yes"
+) |> 
+knitr::kable()
+```
+
+6\. Forecasting Weekly Sales at Walmart: The data in WalmartStore1Dept72.csv is a subset from a larger datasets on weekly department-wise sales at 45 Walmart stores, which were released by Walmart as part of a hiring contest hosted on kaggle.com. The file includes data on a single department at one specific store.
+
+The fields include:
+
+-   Date - the week
+-   Weekly_Sales - sales for the given department in the given store
+-   IsHoliday - whether the week is a special holiday week
+-   Temperature - average temperature in the region
+-   Fuel_Price - cost of fuel in the region
+-   MarkDown1-5 - anonymized data related to promotional markdowns that
+-   Walmart is running. MarkDown data is only available after Nov 2011, and is not available for all stores all the time.
+-   CPI - the consumer price index\
+    Unemployment - the unemployment rate
+
+Figure 7.15 shows a time plot of weekly sales in this department. We are interested in creating a forecasting model for weekly sales for the next 26 weeks.
+
+a\. Recreate the time plot of the weekly sales data.
+
+```{r wmt s1}
+#code that produces a plot should go here
+
+wmt_s1 = read_csv("WalmartStore1Dept72.csv", show_col_types = FALSE)
+wmt_s1 = wmt_s1[order(as.Date(wmt_s1$Date, format = "%m/%d/%Y")),]
+ws_ts = ts(wmt_s1$Weekly_Sales, start = c(2010, 2), end = c(2012, 10), frequency = 67)
+ws_ts
+
+plot(ws_ts, xlab = 'Year', ylab = 'Weekly Sales', 
+     main = 'Weekly Sales in Department #27 of Walmart Store 1')
+```
+
+Which systematic patterns appear in this series?
+
+*There seems to be a lack of trend as well as seasonality in the weekly sales time series. There is a cycle however that occurs around late 2010 and early 2011 with the two speak events.*
+
+b\. Create time plots of the other numerical series (Temperature, Fuel_Price, CPI, and Unemployment). Also create scatter plots of the sales series against each of these four series (each point in the scatter plot will be a week).
+
+```{r temp}
+# code for external variables time series plots
+
+ws_temp = ts(wmt_s1$Temperature, start = c(2010, 2), end = c(2012, 10), frequency = 67)
+ws_fp = ts(wmt_s1$Fuel_Price, start = c(2010, 2), end = c(2012, 10), frequency = 67)
+ws_cpi = ts(wmt_s1$CPI, start = c(2010, 2), end = c(2012, 10), frequency = 67)
+ws_unem = ts(wmt_s1$Unemployment, start = c(2010, 2), end = c(2012, 10), frequency = 67)
+
+plot(ws_temp, xlab = 'Year', ylab = 'Temperature, F')
+plot(ws_fp, xlab = 'Year', ylab = 'Fuel Price, $') 
+plot(ws_cpi, xlab = 'Year', ylab = 'CPI') 
+plot(ws_unem, xlab = 'Year', ylab = 'Unemployment Rate') 
+```
+
+```{r scat}
+# code for external variables scatter plots
+
+scat_ws = wmt_s1$Weekly_Sales
+scat_temp = wmt_s1$Temperature
+scat_fp = wmt_s1$Fuel_Price
+scat_cpi = wmt_s1$CPI
+scat_Unem = wmt_s1$Unemployment
+
+
+plot(scat_ws,scat_temp, col='pink', pch=2, xlab = 'Weekly Sales', 
+     ylab = 'Temperature, F') 
+plot(scat_ws,scat_fp, col='lightblue', pch=1, xlab = 'Weekly Sales', 
+     ylab = 'Fuel Price, $')
+plot(scat_ws,scat_cpi, col='gray', pch=3, xlab = 'Weekly Sales', 
+     ylab = 'Consumer Price Index')
+plot(scat_ws,scat_Unem, col='darkgreen', pch=4, xlab = 'Weekly Sales', 
+     ylab = 'Unemployment Rate')
+```
+
+From the charts, which of the four series would potentially be useful as external predictors in a regression model for forecasting sales?
+
+*The fuel price seems to exhibit the less trend and seasonality among the rest of the series. CPI and Unemployment rate have clear trend while temperature is both seasonal and cyclical. Also, the scatter plot show similar spread across the four series against weekly sales. Fuel price might be the better choice as the external predictor.*
+
+The following questions are not in your textbook. You will need to also complete these programming questions in your submission notebook.
+
+c\. Fit an ARIMA model with 1 lag and external predictors for Weekly_Sales that treats Nov 4, 2011 to Oct 26, 2012 as the training period, and the next 26 weeks as the test period.
+
+```{r train}
+
+train_set = wmt_s1[92:143, ]
+
+outcome = train_set$Weekly_Sales
+predictors = as.matrix(train_set[c("Temperature", "Fuel_Price",
+                                   "CPI", "Unemployment")])
+
+fp = as.matrix(train_set[c("Fuel_Price")])
+```
+
+Compute the RMSE for the training period.
+
+```{r arima}
+# model selection, fit and accuracy code goes here
+
+arima_train_fit.a = arima(outcome, order=c(1,1,0), xreg =predictors)
+summary(arima_train_fit.a)
+
+arima_train_fit.fp = arima(outcome, order=c(1,1,0), xreg = fp)
+summary(arima_train_fit.fp)
+
+
+arima_train_fit = arima(outcome, order=c(1,1,0))
+summary(arima_train_fit)
+```
+
+d\. Create a mean forecasts for the test period. Create a time plot of the fitted values and a plot of the model residuals. Compute the RMSE for the training period.
+
+arima_sforecast
+
+```{r}
+# mean model code goes here
+
+wmt_val = read.csv('WalmartStore1Dept72_validation.csv', 
+                   stringsAsFactors = FALSE)
+wmt_valt = as.matrix(wmt_val[c("Temperature", "Fuel_Price",
+                               "CPI", "Unemployment")])
+
+
+arima_forecast = predict(arima_train_fit.a, newxreg=wmt_valt) # no residual
+summary(arima_forecast)
+
+arima_sforecast = forecast(arima_train_fit) # just to test forecast
+summary(arima_sforecast)
+
+#arima_mforecast = forecast(arima_train_fit.a, xreg = wmt_valt) # error message
+#summary(arima_mforecast)
+```
+
+```{r}
+# mean and arima model plots  code goes here
+
+ws_train = ts(train_set$Weekly_Sales, start = c(2011, 11), 
+              end = c(2012, 10), frequency = 32)
+
+arima_pred = ts(data.frame(arima_forecast$pred), start = c(2011, 11), 
+                end = c(2012, 10), frequency = 32)
+
+sf = data.frame(arima_sforecast)
+arima_sf = ts(sf$Point.Forecast, start = c(2011, 11))
+
+
+autoplot(ws_train, ylab = "Weekly Sales, $", xlab = "Year", series = 'Train Set') +
+   autolayer(arima_pred, series = "Prediction") 
+
+autoplot(arima_sf, ylab = "Weekly Sales, $", xlab = "Year", series = 'Simple Prediction')
+```
+
+```{r}
+# arima model residuals plot code goes here
+
+autoplot(arima_sforecast$residuals, ylab = "Residual", xlab = "ts")
+
+
+
+
+#############
+
+
+7.6 d:
+
+ws1d72_fit <- ws1d72_trn |>
+model(
+x2_ma1 = ARIMA(Weekly_Sales ~ pdq(0, 1, 1) + 1 +
+Unemployment + Temperature),
+mean = MEAN(Weekly_Sales)
+)
+ws1d72_fit |>
+augment() |>
+autoplot(Weekly_Sales, color = 'gray') +
+geom_line(aes(y = .fitted, color = .model)) +
+labs(title = "Fitted Values") +
+theme_minimal()
+
+ws1d72_fit["x2_ma1"] |>
+gg_tsresiduals()
+
+ws1d72_fit |>
+accuracy() |>
+as_tibble() |>
+select(.model, .type, RMSE)
+
+#  RMSE output
+
+1 x2_ma1 Training 22123.
+2 mean Training 25544.
+
+# The ARIMA model performs better than the mean model
+
+f:
+
+ws1d72_fc <- ws1d72_fit['x2_ma1'] |>
+forecast(new_data = ws1d72_tst)
+ws1d72_fc |>
+autoplot(ws1d72_trn)
+
+(please keep in mind there are multiple frameworks to achieve this)
+```
+
+```{r}
+#  model accuracy comparison code goes here
+
+```
+
+e\. Compare the performance of the ARIMA model to the mean over the training period. Which one performs better?
+
+*Was not successful to get forecast function to run properly with the xreg. No comparison.*
+
+f\. Plot the ARIMA model forecasted values. Use WalmartStore1Dept72_validation.csv for your regression model data.
+
+```{r}
+# code for ARIMA model forecasted values plot goes here
+```
